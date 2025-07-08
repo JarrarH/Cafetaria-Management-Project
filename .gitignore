@@ -1,41 +1,815 @@
-# Prerequisites
-*.d
+#include <iostream>
+#include <string>
+#include <fstream>
+using namespace std;
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+// User class definition
+class User
+{
+public:
+    int id;
+    string username;
+    string password;
+    User* next;
+    User() {}
+    User(int id, string& username, string& password)
+        : id(id), username(username), password(password), next(NULL) {}
+};
 
-# Precompiled Headers
-*.gch
-*.pch
+// Order class definition
+class Order
+{
+public:
+    int id;
+    int userId;
+    int menuItemId;
+    int quantity;
+    Order* next;
 
-# Linker files
-*.ilk
+    Order() {}
 
-# Debugger Files
-*.pdb
+    Order(int id, int userId, int menuItemId, int quantity)
+        : id(id), userId(userId), menuItemId(menuItemId), quantity(quantity), next(NULL) {}
+};
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+// MenuItem class definition
+class MenuItem
+{
+public:
+    int id;
+    string name;
+    double price;
+    MenuItem* left;
+    MenuItem* right;
 
-# Fortran module files
-*.mod
-*.smod
+    MenuItem(int id, string& name, double price)
+        : id(id), name(name), price(price), left(NULL), right(NULL) {}
+};
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+// MenuManager class definition
+class MenuManager
+{
+private:
+    MenuItem* root;
 
-# Executables
-*.exe
-*.out
-*.app
+    void addMenuItem(MenuItem*& root, int id, string& name, double price)
+    {
+        if (root == NULL)
+        {
+            root = new MenuItem(id, name, price);
+            return;
+        }
+        if (id < root->id)
+        {
+            addMenuItem(root->left, id, name, price);
+        }
+        else
+        {
+            addMenuItem(root->right, id, name, price);
+        }
+        cout << "Menu added successfully\n\n";
+    }
 
-# debug information files
-*.dwo
+    void inOrderDisplay(MenuItem* root)
+    {
+        if (root == NULL)
+            return;
+        inOrderDisplay(root->left);
+        cout << "Menu ID: " << root->id << ". " << "Menu Name: " << root->name << " - Rs." << root->price << "\n";
+        inOrderDisplay(root->right);
+        cout << endl;
+    }
+
+    MenuItem* findMenuItem(MenuItem* root, int id)
+    {
+        if (root == NULL || root->id == id)
+            return root;
+        if (id < root->id)
+            return findMenuItem(root->left, id);
+        return findMenuItem(root->right, id);
+    }
+
+    MenuItem* removeMenuItem(MenuItem* root, int id)
+    {
+        if (root == NULL)
+            return root;
+        if (id < root->id)
+        {
+            root->left = removeMenuItem(root->left, id);
+        }
+        else if (id > root->id)
+        {
+            root->right = removeMenuItem(root->right, id);
+        }
+        else
+        {
+            if (root->left == NULL)
+            {
+                MenuItem* temp = root->right;
+                delete root;
+                return temp;
+            }
+            else if (root->right == NULL)
+            {
+                MenuItem* temp = root->left;
+                delete root;
+                return temp;
+            }
+            MenuItem* temp = minValueNode(root->right);
+            root->id = temp->id;
+            root->name = temp->name;
+            root->price = temp->price;
+            root->right = removeMenuItem(root->right, temp->id);
+        }
+        return root;
+    }
+
+    MenuItem* minValueNode(MenuItem* node)
+    {
+        MenuItem* current = node;
+        while (current && current->left != NULL)
+            current = current->left;
+        return current;
+    }
+
+    void saveMenuToFile(MenuItem* root, ofstream& file)
+    {
+        if (root == NULL)
+            return;
+        saveMenuToFile(root->left, file);
+        file << "MenuID: " << root->id << " " << "MenuName: " << root->name << " " << "Price: " << root->price << "\n";
+        saveMenuToFile(root->right, file);
+    }
+
+    void saveMenuToFile()
+    {
+        ofstream file("menu.txt");
+        saveMenuToFile(root, file);
+        file.close();
+    }
+
+    void loadMenuFromFile()
+    {
+        ifstream file("menu.txt");
+        if (!file.is_open())
+            return;
+        int id;
+        string name;
+        double price;
+        while (file >> id >> name >> price)
+        {
+            addMenuItem(id, name, price);
+        }
+        file.close();
+    }
+
+public:
+    MenuManager() : root(NULL)
+    {
+        loadMenuFromFile();
+    }
+
+    void addMenuItem(int id, string& name, double price)
+    {
+        addMenuItem(root, id, name, price);
+        ofstream file("menu.txt", ios::app);
+        file << "MenuID: " << id << " " << "MenuName: " << name << " " << "Price: Rs." << price << "\n";
+        file.close();
+    }
+
+    void displayMenu()
+    {
+        cout << "Menu:\n";
+        inOrderDisplay(root);
+    }
+
+    void updateMenuItem(int id, string& name, double price)
+    {
+        MenuItem* item = findMenuItem(root, id);
+        if (item != NULL)
+        {
+            item->name = name;
+            item->price = price;
+            cout << "Menu item updated.\n";
+            ofstream file("menu_temp.txt");
+            saveMenuToFile(root, file);
+            file.close();
+            remove("menu.txt");
+            rename("menu_temp.txt", "menu.txt");
+        }
+        else
+        {
+            cout << "Menu item not found.\n";
+        }
+    }
+
+    void removeMenuItem(int id)
+    {
+        root = removeMenuItem(root, id);
+        ofstream file("menu_temp.txt");
+        saveMenuToFile(root, file);
+        file.close();
+        remove("menu.txt");
+        rename("menu_temp.txt", "menu.txt");
+        cout << "Menu item removed.\n";
+    }
+
+    double getMenuItemPrice(int id)
+    {
+        MenuItem* item = findMenuItem(root, id);
+        if (item != NULL)
+        {
+            return item->price;
+        }
+        else
+        {
+            cout << "Menu item not found.\n";
+            return 0.0;
+        }
+    }
+};
+
+// OrderManager class definition
+class OrderManager
+{
+public:
+    Order* front;
+    Order* rear;
+    int orderCount;
+
+    OrderManager() : front(NULL), rear(NULL), orderCount(0)
+    {
+        loadOrdersFromFile();
+    }
+
+    void placeOrder(int userId, int menuItemId, int quantity)
+    {
+        Order* newOrder = new Order(orderCount++, userId, menuItemId, quantity);
+        if (rear != NULL)
+        {
+            rear->next = newOrder;
+        }
+        rear = newOrder;
+        if (front == NULL)
+        {
+            front = newOrder;
+        }
+        cout << "Order placed successfully.\n";
+        ofstream file("orders.txt", ios::app);
+        file << "OrderNo.: " << newOrder->id << " " << "UserID: " << userId << " " << "MenuID: " << menuItemId << " " << "Quantity: " << quantity << "\n";
+        file.close();
+    }
+
+    void displayOrders()
+    {
+        Order* temp = front;
+        cout << "Orders:\n";
+        while (temp != NULL)
+        {
+            cout << "Order ID: " << temp->id << ", User ID: " << temp->userId << ", Menu Item ID: " << temp->menuItemId << ", Quantity: " << temp->quantity << "\n";
+            temp = temp->next;
+        }
+    }
+
+    void modifyOrder(int id, int menuItemId, int quantity)
+    {
+        Order* temp = front;
+        while (temp != NULL)
+        {
+            if (temp->id == id)
+            {
+                temp->menuItemId = menuItemId;
+                temp->quantity = quantity;
+                cout << "Order modified.\n";
+                ofstream file("orders_temp.txt");
+                saveOrdersToFile(file);
+                file.close();
+                remove("orders.txt");
+                rename("orders_temp.txt", "orders.txt");
+                return;
+            }
+            temp = temp->next;
+        }
+        cout << "Order not found.\n";
+    }
+
+    void cancelOrder(int id)
+    {
+        if (front == NULL)
+            return;
+        if (front->id == id)
+        {
+            Order* temp = front;
+            front = front->next;
+            if (front == NULL)
+                rear = NULL;
+            delete temp;
+            cout << "Order cancelled.\n";
+            ofstream file("orders_temp.txt");
+            saveOrdersToFile(file);
+            file.close();
+            remove("orders.txt");
+            rename("orders_temp.txt", "orders.txt");
+            return;
+        }
+
+        Order* temp = front;
+        while (temp->next != NULL && temp->next->id != id)
+        {
+            temp = temp->next;
+        }
+
+        if (temp->next == NULL)
+        {
+            cout << "Order not found.\n";
+            return;
+        }
+
+        Order* toDelete = temp->next;
+        temp->next = temp->next->next;
+        if (toDelete == rear)
+            rear = temp;
+        delete toDelete;
+        cout << "Order cancelled.\n";
+        ofstream file("orders_temp.txt");
+        saveOrdersToFile(file);
+        file.close();
+        remove("orders.txt");
+        rename("orders_temp.txt", "orders.txt");
+    }
+
+    void saveOrdersToFile(ofstream& file)
+    {
+        Order* temp = front;
+        while (temp != NULL)
+        {
+            file << "OrderNo.: " << temp->id << " " << "UserID: " << temp->userId << " " << "MenuID: " << temp->menuItemId << " " << "Quantity: " << temp->quantity << "\n";
+            temp = temp->next;
+        }
+    }
+
+    void saveOrdersToFile()
+    {
+        ofstream file("orders.txt");
+        saveOrdersToFile(file);
+        file.close();
+    }
+
+    void loadOrdersFromFile()
+    {
+        ifstream file("orders.txt");
+        if (!file.is_open())
+            return;
+        int id, userId, menuItemId, quantity;
+        while (file >> id >> userId >> menuItemId >> quantity)
+        {
+            Order* newOrder = new Order(id, userId, menuItemId, quantity);
+            if (rear != NULL)
+            {
+                rear->next = newOrder;
+            }
+            rear = newOrder;
+            if (front == NULL)
+            {
+                front = newOrder;
+            }
+            orderCount++;
+        }
+        file.close();
+    }
+};
+
+// InventoryItem class definition
+class InventoryItem
+{
+public:
+    int id;
+    string name;
+    int quantity;
+    InventoryItem* next;
+
+    InventoryItem() {}
+
+    InventoryItem(int id, string& name, int quantity)
+        : id(id), name(name), quantity(quantity), next(NULL) {}
+};
+
+// InventoryManager class definition
+class InventoryManager
+{
+private:
+    InventoryItem* head;
+
+    void saveInventoryToFile()
+    {
+        ofstream file("inventory.txt");
+        InventoryItem* temp = head;
+        while (temp != NULL)
+        {
+            file << "ID: " << temp->id << " " << "Name: " << temp->name << " " << "Quantity: " << temp->quantity << "\n";
+            temp = temp->next;
+        }
+        file.close();
+    }
+
+    void loadInventoryFromFile()
+    {
+        ifstream file("inventory.txt");
+        if (!file.is_open())
+            return;
+        int id;
+        string name;
+        int quantity;
+        while (file >> id >> name >> quantity)
+        {
+            addItem(id, name, quantity);
+        }
+        file.close();
+    }
+
+public:
+    InventoryManager() : head(NULL)
+    {
+        loadInventoryFromFile();
+    }
+
+    void addItem(int id, string& name, int quantity)
+    {
+        InventoryItem* newItem = new InventoryItem(id, name, quantity);
+        newItem->next = head;
+        head = newItem;
+        saveInventoryToFile();
+    }
+
+    void displayInventory()
+    {
+        InventoryItem* temp = head;
+        cout << "Inventory:\n";
+        while (temp != NULL)
+        {
+            cout << "ID: " << temp->id << ", Name: " << temp->name << ", Quantity: " << temp->quantity << "\n";
+            temp = temp->next;
+        }
+    }
+
+    void updateItem(int id, string& name, int quantity)
+    {
+        InventoryItem* temp = head;
+        while (temp != NULL)
+        {
+            if (temp->id == id)
+            {
+                temp->name = name;
+                temp->quantity = quantity;
+                saveInventoryToFile();
+                cout << "Inventory item updated.\n";
+                return;
+            }
+            temp = temp->next;
+        }
+        cout << "Inventory item not found.\n";
+    }
+
+    void removeItem(int id)
+    {
+        if (head == NULL)
+            return;
+        if (head->id == id)
+        {
+            InventoryItem* temp = head;
+            head = head->next;
+            delete temp;
+            saveInventoryToFile();
+            cout << "Inventory item removed.\n";
+            return;
+        }
+        InventoryItem* temp = head;
+        while (temp->next != NULL && temp->next->id != id)
+        {
+            temp = temp->next;
+        }
+        if (temp->next == NULL)
+        {
+            cout << "Inventory item not found.\n";
+            return;
+        }
+        InventoryItem* toDelete = temp->next;
+        temp->next = temp->next->next;
+        delete toDelete;
+        saveInventoryToFile();
+        cout << "Inventory item removed.\n";
+    }
+};
+
+// UserManager class definition
+class UserManager
+{
+public:
+    User* head;
+    int userCount;
+
+    UserManager() : head(NULL), userCount(0)
+    {
+        loadUsersFromFile();
+    }
+
+    void registerUser(string& username, string& password)
+    {
+        User* newUser = new User(userCount++, username, password);
+        newUser->next = head;
+        head = newUser;
+        cout << "User registered successfully. Your user ID is " << userCount - 1 << endl;
+        cout << endl;
+        ofstream file("users.txt", ios::app);
+        file << "USerID: " << newUser->id << " " << "UserName: " << username << " " << "Password: " << password << "\n";
+        file.close();
+    }
+
+    void displayUsers()
+    {
+        User* temp = head;
+        cout << "Users:\n";
+        while (temp != NULL)
+        {
+            cout << "ID: " << temp->id << ", Username: " << temp->username << "\n";
+            temp = temp->next;
+        }
+    }
+
+    User* loginUser(string& username, string& password)
+    {
+        User* temp = head;
+        while (temp != NULL)
+        {
+            if (temp->username == username && temp->password == password)
+            {
+                system("cls");
+                cout << "Login successful.\n\n";
+                return temp;
+            }
+            temp = temp->next;
+        }
+        cout << "Invalid username or password.\n\n";
+        return NULL;
+    }
+
+    void generateBill(int userId, OrderManager& orderManager, MenuManager& menuManager)
+    {
+        Order* order = orderManager.front;
+        double totalBill = 0.0;
+
+        cout << "Generating bill for User ID: " << userId << "\n";
+        while (order != NULL)
+        {
+            if (order->userId == userId)
+            {
+                double price = menuManager.getMenuItemPrice(order->menuItemId);
+                totalBill += price * order->quantity;
+                cout << "Item: " << order->menuItemId << ", Quantity: " << order->quantity << ", Price: Rs." << price << "\n";
+            }
+            order = order->next;
+        }
+        cout << "Total Bill: Rs." << totalBill << "\n";
+    }
+
+    void saveUsersToFile()
+    {
+        ofstream file("users.txt");
+        User* temp = head;
+        while (temp != NULL)
+        {
+            file << "UserID: " << temp->id << " " << "UserName: " << temp->username << " " << "Password: " << temp->password << "\n";
+            temp = temp->next;
+        }
+        file.close();
+    }
+
+    void loadUsersFromFile()
+    {
+        ifstream file("users.txt");
+        if (!file.is_open())
+            return;
+        int id;
+        string username, password;
+        while (file >> id >> username >> password)
+        {
+            User* newUser = new User(id, username, password);
+            newUser->next = head;
+            head = newUser;
+            userCount++;
+        }
+        file.close();
+    }
+};
+
+// Main function
+int main()
+{
+    UserManager userManager;
+    MenuManager menuManager;
+    OrderManager orderManager;
+    InventoryManager inventoryManager;
+
+    string adminUsername = "admin";
+    string adminPassword = "admin";
+
+    string username, password;
+    User* loggedInUser = NULL;
+
+    int id, quantity;
+    string itemName;
+
+loginMenu:
+    while (true)
+    {
+        cout << "1. Login\n2. Register\n3. Exit\n";
+        cout << "Enter your choice: ";
+        int choice;
+        cin >> choice;
+
+        switch (choice)
+        {
+        case 1:
+            cout << "Enter username: ";
+            cin >> username;
+            cout << "Enter password: ";
+            cin >> password;
+            if (username == adminUsername && password == adminPassword)
+            {
+                system("cls");
+                cout << "Admin login successful.\n";
+                while (true)
+                {
+                    cout << "\nAdmin Menu:\n";
+                    cout << "1. Add Menu Item\n2. Update Menu Item\n3. Remove Menu Item\n4. Display Menu\n5. Display Orders\n6. Modify Order \n7. Cancel Order\n8. Display Users\n9. Add Inventory Item\n10. Display Inventory\n11. Update Inventory Item\n12. Remove Inventory Item\n13. Logout\n14. Exit\n";
+                    int adminChoice;
+                    cout << "Enter your choice: ";
+                    cin >> adminChoice;
+                    switch (adminChoice)
+                    {
+                    case 1:
+                    {
+                        int id;
+                        string name;
+                        double price;
+                        cout << "Enter ID: ";
+                        cin >> id;
+                        cout << "Enter Name: ";
+                        cin.ignore();
+                        getline(cin, name);
+                        cout << "Enter Price: ";
+                        cin >> price;
+                        menuManager.addMenuItem(id, name, price);
+                        break;
+                    }
+                    case 2:
+                    {
+                        int id;
+                        string name;
+                        double price;
+                        cout << "Enter ID of menu item to update: ";
+                        cin >> id;
+                        cout << "Enter new name: ";
+                        cin.ignore();
+                        getline(cin, name);
+                        cout << "Enter new price: ";
+                        cin >> price;
+                        menuManager.updateMenuItem(id, name, price);
+                        break;
+                    }
+                    case 3:
+                    {
+                        int id;
+                        cout << "Enter ID of menu item to remove: ";
+                        cin >> id;
+                        menuManager.removeMenuItem(id);
+                        break;
+                    }
+                    case 4:
+                        menuManager.displayMenu();
+                        break;
+                    case 5:
+                        orderManager.displayOrders();
+                        break;
+                    case 6:
+                        cout << "Enter order ID: ";
+                        cin >> id;
+                        cout << "Enter new menu item ID: ";
+                        cin >> id;
+                        cout << "Enter new quantity: ";
+                        cin >> quantity;
+                        orderManager.modifyOrder(id, id, quantity);
+                        break;
+                    case 7:
+                    {
+                        int id;
+                        cout << "Enter ID of order to cancel: ";
+                        cin >> id;
+                        orderManager.cancelOrder(id);
+                        break;
+                    }
+                    case 8:
+                        userManager.displayUsers();
+                        break;
+                    case 9:
+                        cout << "Enter item ID: ";
+                        cin >> id;
+                        cout << "Enter item name: ";
+                        cin >> itemName;
+                        cout << "Enter item quantity: ";
+                        cin >> quantity;
+                        inventoryManager.addItem(id, itemName, quantity);
+                        break;
+                    case 10:
+                        inventoryManager.displayInventory();
+                        break;
+                    case 11:
+                        cout << "Enter item ID: ";
+                        cin >> id;
+                        cout << "Enter new item name: ";
+                        cin >> itemName;
+                        cout << "Enter new item quantity: ";
+                        cin >> quantity;
+                        inventoryManager.updateItem(id, itemName, quantity);
+                        break;
+                    case 12:
+                        cout << "Enter item ID: ";
+                        cin >> id;
+                        inventoryManager.removeItem(id);
+                        break;
+                    case 13:
+                        loggedInUser = NULL;
+                        system("cls");
+                        goto loginMenu;
+                        break;
+                    case 14:
+                        exit(0);
+                        break;
+                    default:
+                        cout << "Invalid choice.\n";
+                    }
+                }
+            }
+            else
+            {
+                loggedInUser = userManager.loginUser(username, password);
+            }
+            break;
+        case 2:
+            cout << "Enter username: ";
+            cin >> username;
+            cout << "Enter password: ";
+            cin >> password;
+            userManager.registerUser(username, password);
+            break;
+        case 3:
+            exit(0);
+            break;
+        default:
+            cout << "Invalid choice.\n";
+        }
+
+        if (loggedInUser != NULL)
+        {
+            while (true)
+            {
+                cout << "\nUser Menu:\n";
+                cout << "1. Place Order\n2. View Menu\n3. Generate Bill\n4. Logout\n5. Exit\n";
+                int userChoice;
+                cout << "Enter your choice: ";
+                cin >> userChoice;
+                switch (userChoice)
+                {
+                case 1:
+                {
+                    int menuItemId, quantity;
+                    cout << "Enter Menu Item ID: ";
+                    cin >> menuItemId;
+                    cout << "Enter Quantity: ";
+                    cin >> quantity;
+                    orderManager.placeOrder(loggedInUser->id, menuItemId, quantity);
+                    break;
+                }
+                case 2:
+                    menuManager.displayMenu();
+                    break;
+                case 3:
+                    userManager.generateBill(loggedInUser->id, orderManager, menuManager);
+                    break;
+                case 4:
+                    loggedInUser = NULL;
+                    system("cls");
+                    goto loginMenu;
+                    break;
+                case 5:
+                    exit(0);
+                    break;
+                default:
+                    cout << "Invalid choice.\n";
+                }
+            }
+        }
+    }
+
+    return 0;
+}
